@@ -11,12 +11,25 @@ from datetime import datetime
 BASE_URL = "https://store.nintendo.co.kr/all-product"
 
 def get_html(url):
-    req = urllib.request.Request(
-        url, 
-        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    )
-    with urllib.request.urlopen(req) as response:
-        return response.read().decode('utf-8')
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Connection': 'keep-alive',
+        'Referer': 'https://store.nintendo.co.kr/'
+    }
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req) as response:
+                return response.read().decode('utf-8')
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"\n[Warning] Request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in 3 seconds...")
+            time.sleep(3)
 
 def parse_products_from_html(html):
     items = re.findall(r'<li class="item product product-item">.*?</li>', html, re.DOTALL)
