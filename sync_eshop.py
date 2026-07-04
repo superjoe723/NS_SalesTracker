@@ -322,7 +322,7 @@ def main():
     total_saved = 0
 
     for page in range(1, total_pages + 1):
-        page_url = f"{BASE_URL}?p={page}"
+        page_url = f"{BASE_URL}?p={page}&product_list_order=position"
         print(f"[{page}/{total_pages}] Syncing: {page_url} ... ", end="", flush=True)
         
         try:
