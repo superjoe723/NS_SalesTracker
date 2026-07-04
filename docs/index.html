@@ -1749,7 +1749,7 @@
       
       // 3. Sorting
       if (currentSort === 'default') {
-        result.sort((a, b) => a.original_index - b.original_index);
+        result.sort((a, b) => b.original_index - a.original_index);
       } else if (currentSort === 'discount_desc') {
         result.sort((a, b) => b.discount_rate - a.discount_rate);
       } else if (currentSort === 'price_asc') {
