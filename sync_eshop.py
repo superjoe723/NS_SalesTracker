@@ -29,12 +29,13 @@ def export_to_json(db_path, json_path):
         conn.close()
         return
     
-    # 3. Fetch all games with their latest price info
+    # 3. Fetch all games with their latest price info, ordered by store_position (position)
     cursor.execute('''
         SELECT g.nsuid, g.product_id, g.title, g.release_date, g.image_url,
                p.regular_price, p.discount_price, p.is_discounted
         FROM games g
         LEFT JOIN price_history p ON g.nsuid = p.nsuid AND p.logged_date = ?
+        ORDER BY COALESCE(g.store_position, 999999) ASC
     ''', (latest_log_date,))
     
     rows = cursor.fetchall()
@@ -212,6 +213,10 @@ def init_db(db_path):
         cursor.execute("DROP TABLE IF EXISTS games")
         cursor.execute("DROP TABLE IF EXISTS price_history")
         conn.commit()
+    elif columns and "store_position" not in columns:
+        print("Migrating games table to add store_position...")
+        cursor.execute("ALTER TABLE games ADD COLUMN store_position INTEGER")
+        conn.commit()
 
     # Games metadata table (rarely changes)
     cursor.execute('''
@@ -221,6 +226,7 @@ def init_db(db_path):
             title TEXT,
             release_date TEXT,
             image_url TEXT,
+            store_position INTEGER,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -249,14 +255,15 @@ def save_products_to_db(conn, products):
         # 1. Update general metadata
         cursor.execute('''
             INSERT OR REPLACE INTO games 
-            (nsuid, product_id, title, release_date, image_url, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (nsuid, product_id, title, release_date, image_url, store_position, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             p["nsuid"],
             p["product_id"],
             p["title"],
             p["release_date"],
             p["image_url"],
+            p.get("store_position"),
             now_timestamp
         ))
         
@@ -325,6 +332,10 @@ def main():
             if not products:
                 print("No products found. Stopping.")
                 break
+                
+            # Assign store_position based on crawling page and offset
+            for idx, p in enumerate(products):
+                p["store_position"] = (page - 1) * 24 + idx + 1
                 
             save_products_to_db(conn, products)
             total_saved += len(products)

@@ -1399,6 +1399,11 @@
         
         allData = await response.json();
         
+        // Add original index based on JSON array order (which is store_position order)
+        allData.games.forEach((game, idx) => {
+          game.original_index = idx;
+        });
+        
         // Setup stats
         document.getElementById('stat-total-games').textContent = Number(allData.total_games).toLocaleString() + ' 개';
         document.getElementById('stat-total-sales').textContent = Number(allData.total_sales).toLocaleString() + ' 개';
@@ -1653,35 +1658,39 @@
       
       if (tab === 'discount') {
         sortSelect.innerHTML = `
+          <option value="default">추천순 (기본)</option>
           <option value="discount_desc">할인율 높은 순</option>
           <option value="price_asc">할인가 낮은 순</option>
           <option value="price_desc">할인가 높은 순</option>
           <option value="release_desc">최신 발매 순</option>
         `;
-        currentSort = 'discount_desc';
+        currentSort = 'default';
       } else if (tab === 'new') {
         sortSelect.innerHTML = `
+          <option value="default">추천순 (기본)</option>
           <option value="release_desc">최신 발매 순</option>
           <option value="price_asc">가격 낮은 순</option>
           <option value="price_desc">가격 높은 순</option>
         `;
-        currentSort = 'release_desc';
+        currentSort = 'default';
       } else if (tab === 'wishlist') {
         sortSelect.innerHTML = `
+          <option value="default">추천순 (기본)</option>
           <option value="discount_desc">할인율 높은 순</option>
           <option value="price_asc">가격 낮은 순</option>
           <option value="price_desc">가격 높은 순</option>
           <option value="release_desc">최신 발매 순</option>
         `;
-        currentSort = 'discount_desc';
+        currentSort = 'default';
       } else {
         sortSelect.innerHTML = `
+          <option value="default">추천순 (기본)</option>
           <option value="title_asc">가나다 순</option>
           <option value="release_desc">최신 발매 순</option>
           <option value="price_asc">가격 낮은 순</option>
           <option value="price_desc">가격 높은 순</option>
         `;
-        currentSort = 'title_asc';
+        currentSort = 'default';
       }
       
       // Reset page limits
@@ -1739,7 +1748,9 @@
       }
       
       // 3. Sorting
-      if (currentSort === 'discount_desc') {
+      if (currentSort === 'default') {
+        result.sort((a, b) => a.original_index - b.original_index);
+      } else if (currentSort === 'discount_desc') {
         result.sort((a, b) => b.discount_rate - a.discount_rate);
       } else if (currentSort === 'price_asc') {
         result.sort((a, b) => a.discount_price - b.discount_price);
