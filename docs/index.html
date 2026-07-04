@@ -367,6 +367,34 @@
       transform: scale(1.15);
     }
 
+    .btn-hide {
+      position: absolute;
+      top: 0.75rem;
+      left: 3.0rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 5;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-hide:hover {
+      background: #e60012;
+      border-color: transparent;
+      transform: scale(1.15);
+    }
+
+    .btn-hide:hover i {
+      color: white !important;
+    }
+
     .badge-discount {
       position: absolute;
       top: 0.75rem;
@@ -384,7 +412,7 @@
     .badge-new {
       position: absolute;
       top: 0.75rem;
-      left: 3.2rem;
+      left: 5.25rem;
       background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: white;
       font-weight: 700;
@@ -627,6 +655,30 @@
       transform: scale(1.08);
     }
 
+    .modal-block-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      outline: none;
+    }
+
+    .modal-block-btn:hover {
+      background: #e60012;
+      border-color: transparent;
+      color: white;
+      transform: scale(1.08);
+    }
+
     .modal-meta {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -668,6 +720,133 @@
       width: 100%;
       height: 250px;
       margin-top: 1.5rem;
+    }
+
+    /* Settings Panel */
+    .settings-panel-wrapper {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .settings-section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .settings-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .keyword-input-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .btn-add-keyword {
+      background: var(--primary-gradient);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .btn-add-keyword:hover {
+      box-shadow: 0 4px 12px rgba(230, 0, 18, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .keyword-badges-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .keyword-badge {
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      color: #60a5fa;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .keyword-badge i {
+      cursor: pointer;
+      color: #93c5fd;
+      transition: color 0.2s ease;
+    }
+
+    .keyword-badge i:hover {
+      color: #f87171;
+    }
+
+    .blacklist-games-list {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.4);
+      padding: 0.5rem;
+    }
+
+    .blacklist-game-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      font-size: 0.9rem;
+    }
+
+    .blacklist-game-row:last-child {
+      border-bottom: none;
+    }
+
+    .blacklist-game-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      margin-right: 1rem;
+      color: var(--text-main);
+    }
+
+    .btn-unblock {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .btn-unblock:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.3);
     }
 
     /* Skeleton Loading */
@@ -792,10 +971,13 @@
         <button class="tab-btn" id="tab-all" role="tab" aria-selected="false" onclick="setTab('all')">
           <i class="fa-solid fa-list"></i> 전체 목록
         </button>
+        <button class="tab-btn" id="tab-settings" role="tab" aria-selected="false" onclick="setTab('settings')">
+          <i class="fa-solid fa-gear"></i> 설정
+        </button>
       </div>
 
       <!-- Search and Sort -->
-      <div class="search-row">
+      <div class="search-row" id="search-filter-row">
         <div class="search-wrapper">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input type="text" id="search-input" class="search-input" placeholder="게임 제목을 검색해 보세요..." oninput="handleSearch(this.value)">
@@ -817,6 +999,48 @@
     <div id="wishlist-banner" class="wishlist-banner" style="display: none;">
       <i class="fa-solid fa-circle-check"></i>
       <span id="wishlist-banner-text">관심 게임 중 0개가 할인 중입니다.</span>
+    </div>
+
+    <!-- Settings Panel (Tab content) -->
+    <div id="settings-panel" style="display: none; max-width: 800px; margin: 0 auto;">
+      <div class="settings-panel-wrapper">
+        <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
+          <i class="fa-solid fa-gear" style="color: var(--primary-color);"></i> 개인 설정 및 필터 관리
+        </h2>
+        
+        <!-- Keyword Blacklist -->
+        <div style="margin-bottom: 2.5rem;">
+          <h3 class="settings-section-title">
+            <i class="fa-solid fa-font" style="color: #3b82f6;"></i> 제목 키워드 자동 차단 (블랙리스트)
+          </h3>
+          <p class="settings-desc">
+            여기에 등록한 키워드가 제목에 포함된 게임은 모든 목록에서 완전히 제외됩니다. (예: DLC, 체험판, Demo)
+          </p>
+          
+          <div class="keyword-input-row">
+            <input type="text" id="keyword-input" placeholder="차단할 키워드 입력 (예: DLC)" onkeydown="if(event.key === 'Enter') addKeyword()" class="search-input" style="padding-left: 1.25rem;">
+            <button onclick="addKeyword()" class="btn-add-keyword">추가</button>
+          </div>
+          
+          <div id="keyword-list" class="keyword-badges-list">
+            <!-- Keywords will be rendered as badges -->
+          </div>
+        </div>
+        
+        <!-- Game Blacklist -->
+        <div>
+          <h3 class="settings-section-title">
+            <i class="fa-solid fa-ban" style="color: var(--primary-color);"></i> 개별 차단된 게임 목록 (<span id="blacklisted-games-count">0</span>)
+          </h3>
+          <p class="settings-desc">
+            게임 카드에서 숨김 처리한 게임 목록입니다. 차단 해제 시 다시 목록에 노출됩니다.
+          </p>
+          
+          <div id="blacklisted-games-list" class="blacklist-games-list">
+            <!-- Blacklisted games will be listed here -->
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Loading Spinner -->
@@ -857,9 +1081,14 @@
           <div class="modal-title-wrapper">
             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
               <h2 id="modal-game-title" class="modal-title">-</h2>
-              <button id="modal-fav-btn" class="modal-fav-btn" onclick="toggleFavoriteFromModal()" title="관심 게임 등록">
-                <i class="fa-regular fa-star"></i>
-              </button>
+              <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                <button id="modal-fav-btn" class="modal-fav-btn" onclick="toggleFavoriteFromModal()" title="관심 게임 등록">
+                  <i class="fa-regular fa-star"></i>
+                </button>
+                <button id="modal-block-btn" class="modal-block-btn" onclick="blockGameFromModal()" title="이 게임 차단하기(숨김)">
+                  <i class="fa-solid fa-eye-slash"></i>
+                </button>
+              </div>
             </div>
             <div id="modal-game-meta" class="modal-meta" style="margin-top: 0.5rem;">
               <p><i class="fa-solid fa-calendar-days"></i> 발매일: <span id="modal-release-date">-</span></p>
@@ -901,7 +1130,9 @@
     let allData = { games: [], last_updated: '', total_games: 0, total_sales: 0 };
     let filteredGames = [];
     let wishlist = [];
-    let currentTab = 'discount'; // 'discount' | 'new' | 'wishlist' | 'all'
+    let blacklist = [];
+    let blacklistKeywords = [];
+    let currentTab = 'discount'; // 'discount' | 'new' | 'wishlist' | 'all' | 'settings'
     let currentSort = 'discount_desc';
     let searchQuery = '';
     
@@ -929,15 +1160,16 @@
         document.getElementById('loader').style.display = 'none';
         document.getElementById('games-grid').style.display = 'grid';
         
-        // Load wishlist
+        // Load data stores
         initWishlist();
+        initBlacklist();
         
         // Load settings and set tab
         const savedTab = localStorage.getItem('nintendo_current_tab');
         const savedSort = localStorage.getItem('nintendo_current_sort');
         
         setTab(savedTab || 'discount');
-        if (savedSort) {
+        if (savedSort && savedTab !== 'settings') {
           document.getElementById('sort-select').value = savedSort;
           currentSort = savedSort;
           applyFilters();
@@ -965,6 +1197,15 @@
       document.getElementById('stat-wishlist-count').textContent = wishlist.length.toLocaleString() + ' 개';
     }
 
+    // Initialize Blacklist States
+    function initBlacklist() {
+      const savedBlock = localStorage.getItem('nintendo_blacklist');
+      blacklist = savedBlock ? JSON.parse(savedBlock) : [];
+      
+      const savedKeywords = localStorage.getItem('nintendo_blacklist_keywords');
+      blacklistKeywords = savedKeywords ? JSON.parse(savedKeywords) : [];
+    }
+
     // Toggle Wishlist Status
     function toggleFavorite(nsuid, event) {
       if (event) {
@@ -981,14 +1222,12 @@
       localStorage.setItem('nintendo_wishlist', JSON.stringify(wishlist));
       updateWishlistStats();
       
-      // Update UI: if we are on wishlist tab, we might need to filter out card
       if (currentTab === 'wishlist') {
         applyFilters();
       } else {
         renderGrid(); // update star icon
       }
       
-      // If modal is open for this game, update the modal button too
       const modalNsuid = document.getElementById('modal-nsuid').textContent;
       if (modalNsuid === nsuid) {
         updateModalFavButton(nsuid);
@@ -1014,6 +1253,120 @@
       toggleFavorite(nsuid);
     }
 
+    // Blacklist specific game
+    function blockGame(nsuid, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      
+      if (!blacklist.includes(nsuid)) {
+        blacklist.push(nsuid);
+        localStorage.setItem('nintendo_blacklist', JSON.stringify(blacklist));
+      }
+      
+      // Auto-remove from wishlist if present
+      const favIndex = wishlist.indexOf(nsuid);
+      if (favIndex > -1) {
+        wishlist.splice(favIndex, 1);
+        localStorage.setItem('nintendo_wishlist', JSON.stringify(wishlist));
+        updateWishlistStats();
+      }
+      
+      applyFilters();
+      
+      // Close modal if open
+      const modalNsuid = document.getElementById('modal-nsuid').textContent;
+      if (modalNsuid === nsuid) {
+        closeModal();
+      }
+    }
+
+    function blockGameFromModal() {
+      const nsuid = document.getElementById('modal-nsuid').textContent;
+      blockGame(nsuid);
+    }
+
+    function unblockGame(nsuid) {
+      const index = blacklist.indexOf(nsuid);
+      if (index > -1) {
+        blacklist.splice(index, 1);
+        localStorage.setItem('nintendo_blacklist', JSON.stringify(blacklist));
+        renderBlacklistPanel();
+        applyFilters();
+      }
+    }
+
+    // Blacklist keyword management
+    function addKeyword() {
+      const input = document.getElementById('keyword-input');
+      const keyword = input.value.trim();
+      if (keyword && !blacklistKeywords.includes(keyword)) {
+        blacklistKeywords.push(keyword);
+        localStorage.setItem('nintendo_blacklist_keywords', JSON.stringify(blacklistKeywords));
+        input.value = '';
+        renderBlacklistPanel();
+        applyFilters();
+      }
+    }
+
+    function removeKeyword(keyword) {
+      const index = blacklistKeywords.indexOf(keyword);
+      if (index > -1) {
+        blacklistKeywords.splice(index, 1);
+        localStorage.setItem('nintendo_blacklist_keywords', JSON.stringify(blacklistKeywords));
+        renderBlacklistPanel();
+        applyFilters();
+      }
+    }
+
+    // Render settings panel details
+    function renderBlacklistPanel() {
+      // 1. Render Keywords
+      const keywordListDiv = document.getElementById('keyword-list');
+      keywordListDiv.innerHTML = '';
+      
+      if (blacklistKeywords.length === 0) {
+        keywordListDiv.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">등록된 차단 키워드가 없습니다.</span>';
+      } else {
+        blacklistKeywords.forEach(kw => {
+          const badge = document.createElement('span');
+          badge.className = 'keyword-badge';
+          badge.innerHTML = `${escapeHtml(kw)} <i class="fa-solid fa-xmark" onclick="removeKeyword('${escapeHtmlJS(kw)}')"></i>`;
+          keywordListDiv.appendChild(badge);
+        });
+      }
+      
+      // 2. Render blocked games list
+      document.getElementById('blacklisted-games-count').textContent = blacklist.length;
+      const gamesListDiv = document.getElementById('blacklisted-games-list');
+      gamesListDiv.innerHTML = '';
+      
+      if (blacklist.length === 0) {
+        gamesListDiv.innerHTML = '<div style="text-align: center; padding: 1.5rem 0; font-size: 0.85rem; color: var(--text-muted);">차단된 개별 게임이 없습니다.</div>';
+      } else {
+        blacklist.forEach(nsuid => {
+          const gameObj = allData.games.find(g => g.nsuid === nsuid);
+          const title = gameObj ? gameObj.title : `알 수 없는 게임 (ID: ${nsuid})`;
+          
+          const row = document.createElement('div');
+          row.className = 'blacklist-game-row';
+          row.innerHTML = `
+            <span class="blacklist-game-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+            <button onclick="unblockGame('${nsuid}')" class="btn-unblock">차단 해제</button>
+          `;
+          gamesListDiv.appendChild(row);
+        });
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    
+    function escapeHtmlJS(str) {
+      return str.replace(/'/g, "\\'");
+    }
+
     // Handle tab change
     function setTab(tab) {
       currentTab = tab;
@@ -1028,6 +1381,22 @@
 
       // Save tab to localstorage
       localStorage.setItem('nintendo_current_tab', tab);
+
+      // Handle Settings tab vs Game grids
+      if (tab === 'settings') {
+        document.getElementById('games-grid').style.display = 'none';
+        document.getElementById('load-more-container').style.display = 'none';
+        document.getElementById('wishlist-banner').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('search-filter-row').style.display = 'none';
+        document.getElementById('settings-panel').style.display = 'block';
+        
+        renderBlacklistPanel();
+        return;
+      }
+      
+      document.getElementById('settings-panel').style.display = 'none';
+      document.getElementById('search-filter-row').style.display = 'flex';
 
       // Populate Sorting Option list depending on Tab
       const sortSelect = document.getElementById('sort-select');
@@ -1089,7 +1458,22 @@
 
     // Filter, Sort and Paginate games
     function applyFilters() {
+      if (currentTab === 'settings') return;
+      
       let result = [...allData.games];
+      
+      // 0. Blacklist Filters (Active on all grid tabs)
+      result = result.filter(g => {
+        // Filter out individual blocked games
+        if (blacklist.includes(g.nsuid)) return false;
+        
+        // Filter out keyword matches
+        const titleLower = g.title.toLowerCase();
+        const matchesKeyword = blacklistKeywords.some(kw => titleLower.includes(kw.toLowerCase()));
+        if (matchesKeyword) return false;
+        
+        return true;
+      });
       
       // 1. Tab filter
       if (currentTab === 'discount') {
@@ -1231,6 +1615,9 @@
             <button class="btn-fav" onclick="toggleFavorite('${game.nsuid}', event)" title="관심 게임 추가/제거">
               <i class="${favIconClass}" style="color: ${favColor};"></i>
             </button>
+            <button class="btn-hide" onclick="blockGame('${game.nsuid}', event)" title="이 게임 숨기기 (차단)">
+              <i class="fa-solid fa-eye-slash" style="color: rgba(255,255,255,0.45);"></i>
+            </button>
             ${badgesHtml}
             <img src="${game.image_url || 'https://via.placeholder.com/320x180?text=No+Image'}" 
                  alt="${game.title}" 
@@ -1287,7 +1674,7 @@
         currentPriceEl.style.color = 'var(--text-main)';
       }
       
-      // Update modal favorite button status
+      // Update modal action buttons
       updateModalFavButton(game.nsuid);
       
       // Show/Hide Price history chart
