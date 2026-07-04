@@ -5,10 +5,107 @@ import time
 import math
 import sys
 import argparse
+import json
+import os
 from datetime import datetime
 
 # Base URL for Nintendo Switch Korea online store
 BASE_URL = "https://store.nintendo.co.kr/all-product"
+
+def export_to_json(db_path, json_path):
+    print("Exporting data to JSON for web viewer...")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # 1. Get last updated time
+    cursor.execute("SELECT MAX(last_updated) FROM games")
+    last_updated = cursor.fetchone()[0] or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 2. Get latest logged date to determine current prices
+    cursor.execute("SELECT MAX(logged_date) FROM price_history")
+    latest_log_date = cursor.fetchone()[0]
+    if not latest_log_date:
+        print("No price history records found. Cannot export.")
+        conn.close()
+        return
+    
+    # 3. Fetch all games with their latest price info
+    cursor.execute('''
+        SELECT g.nsuid, g.product_id, g.title, g.release_date, g.image_url,
+               p.regular_price, p.discount_price, p.is_discounted
+        FROM games g
+        LEFT JOIN price_history p ON g.nsuid = p.nsuid AND p.logged_date = ?
+    ''', (latest_log_date,))
+    
+    rows = cursor.fetchall()
+    
+    # Fetch price histories for discounted games to show charts
+    # We only fetch history for games that are currently discounted to keep the JSON small
+    cursor.execute('''
+        SELECT ph.nsuid, ph.logged_date, ph.discount_price
+        FROM price_history ph
+        WHERE ph.nsuid IN (
+            SELECT nsuid FROM price_history WHERE logged_date = ? AND is_discounted = 1
+        )
+        ORDER BY ph.nsuid, ph.logged_date ASC
+    ''', (latest_log_date,))
+    
+    history_rows = cursor.fetchall()
+    history_map = {}
+    for nsuid, logged_date, disc_price in history_rows:
+        if nsuid not in history_map:
+            history_map[nsuid] = []
+        history_map[nsuid].append({"date": logged_date, "price": disc_price})
+        
+    games_list = []
+    total_sales = 0
+    
+    for r in rows:
+        nsuid, product_id, title, release_date, image_url, reg_price, disc_price, is_disc = r
+        
+        # Default fallback values if no price history is recorded yet
+        reg_price = reg_price or 0
+        disc_price = disc_price or reg_price or 0
+        is_disc = is_disc or 0
+        
+        if is_disc:
+            total_sales += 1
+            
+        discount_rate = 0
+        if is_disc and reg_price > 0:
+            discount_rate = int((reg_price - disc_price) / reg_price * 100)
+            
+        game_data = {
+            "nsuid": nsuid,
+            "title": title,
+            "release_date": release_date,
+            "image_url": image_url,
+            "regular_price": reg_price,
+            "discount_price": disc_price,
+            "is_discounted": is_disc,
+            "discount_rate": discount_rate
+        }
+        
+        # Add history if available (only for discounted games to keep size down)
+        if nsuid in history_map:
+            game_data["history"] = history_map[nsuid]
+            
+        games_list.append(game_data)
+        
+    data = {
+        "last_updated": last_updated,
+        "total_games": len(games_list),
+        "total_sales": total_sales,
+        "games": games_list
+    }
+    
+    os.makedirs(os.path.dirname(os.path.abspath(json_path)), exist_ok=True)
+    
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        
+    print(f"Successfully exported {len(games_list)} games (including {total_sales} discounts) to {json_path}")
+    conn.close()
 
 def get_html(url):
     headers = {
@@ -185,6 +282,7 @@ def main():
     parser.add_argument("--db", default="database.sqlite", help="Path to SQLite database file")
     parser.add_argument("--quick", action="store_true", help="Only sync the first 2 pages for a quick test")
     parser.add_argument("--limit-pages", type=int, default=0, help="Limit syncing to a maximum number of pages")
+    parser.add_argument("--json-out", default="docs/data.json", help="Path to output JSON file for web viewer")
     args = parser.parse_args()
 
     print("Initializing Database...")
@@ -238,6 +336,7 @@ def main():
         time.sleep(1.0)
 
     conn.close()
+    export_to_json(args.db, args.json_out)
     elapsed = time.time() - start_time
     print(f"\nSync Completed! Total products processed: {total_saved}")
     print(f"Elapsed Time: {elapsed:.2f} seconds.")
