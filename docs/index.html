@@ -108,7 +108,7 @@
     /* Stats Grid */
     .stats-container {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 1.25rem;
       max-width: 1200px;
       margin: 2rem auto;
@@ -148,6 +148,7 @@
     .stat-icon.red { color: var(--primary-color); background: rgba(230, 0, 18, 0.1); }
     .stat-icon.green { color: var(--accent-color); background: rgba(16, 185, 129, 0.1); }
     .stat-icon.blue { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+    .stat-icon.yellow { color: #eab308; background: rgba(234, 179, 8, 0.1); }
 
     .stat-info {
       display: flex;
@@ -155,7 +156,7 @@
     }
 
     .stat-value {
-      font-size: 1.4rem;
+      font-size: 1.3rem;
       font-weight: 700;
       color: var(--text-main);
     }
@@ -343,6 +344,29 @@
       transform: scale(1.06);
     }
 
+    .btn-fav {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 5;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-fav:hover {
+      background: rgba(15, 23, 42, 0.95);
+      transform: scale(1.15);
+    }
+
     .badge-discount {
       position: absolute;
       top: 0.75rem;
@@ -360,7 +384,7 @@
     .badge-new {
       position: absolute;
       top: 0.75rem;
-      left: 0.75rem;
+      left: 3.2rem;
       background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: white;
       font-weight: 700;
@@ -429,6 +453,24 @@
 
     .sale-active .discount-price {
       color: var(--accent-color);
+    }
+
+    /* Wishlist Summary Banner */
+    .wishlist-banner {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--accent-color);
+      box-shadow: var(--shadow);
+    }
+
+    .wishlist-banner i {
+      font-size: 1.25rem;
     }
 
     /* Load More Section */
@@ -563,6 +605,28 @@
       margin-bottom: 0.5rem;
     }
 
+    .modal-fav-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      outline: none;
+    }
+
+    .modal-fav-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: scale(1.08);
+    }
+
     .modal-meta {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -695,6 +759,13 @@
       </div>
     </div>
     <div class="stat-card">
+      <div class="stat-icon yellow"><i class="fa-solid fa-star"></i></div>
+      <div class="stat-info">
+        <span class="stat-value" id="stat-wishlist-count">0 개</span>
+        <span class="stat-label">내 관심 게임</span>
+      </div>
+    </div>
+    <div class="stat-card">
       <div class="stat-icon blue"><i class="fa-solid fa-clock"></i></div>
       <div class="stat-info">
         <span class="stat-value" id="stat-update-time" style="font-size: 0.95rem; font-weight: 600;">-</span>
@@ -714,6 +785,9 @@
         </button>
         <button class="tab-btn" id="tab-new" role="tab" aria-selected="false" onclick="setTab('new')">
           <i class="fa-solid fa-sparkles"></i> 최신 출시작
+        </button>
+        <button class="tab-btn" id="tab-wishlist" role="tab" aria-selected="false" onclick="setTab('wishlist')">
+          <i class="fa-solid fa-star" style="color: #eab308;"></i> 관심 게임
         </button>
         <button class="tab-btn" id="tab-all" role="tab" aria-selected="false" onclick="setTab('all')">
           <i class="fa-solid fa-list"></i> 전체 목록
@@ -739,6 +813,12 @@
   <!-- Grid of Games -->
   <main class="grid-container">
     
+    <!-- Wishlist Alert Banner -->
+    <div id="wishlist-banner" class="wishlist-banner" style="display: none;">
+      <i class="fa-solid fa-circle-check"></i>
+      <span id="wishlist-banner-text">관심 게임 중 0개가 할인 중입니다.</span>
+    </div>
+
     <!-- Loading Spinner -->
     <div id="loader" class="loader-container">
       <div class="spinner"></div>
@@ -775,8 +855,13 @@
         <div class="modal-header-section">
           <img id="modal-game-img" src="" alt="게임 이미지" class="modal-img">
           <div class="modal-title-wrapper">
-            <h2 id="modal-game-title" class="modal-title">-</h2>
-            <div id="modal-game-meta" class="modal-meta">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+              <h2 id="modal-game-title" class="modal-title">-</h2>
+              <button id="modal-fav-btn" class="modal-fav-btn" onclick="toggleFavoriteFromModal()" title="관심 게임 등록">
+                <i class="fa-regular fa-star"></i>
+              </button>
+            </div>
+            <div id="modal-game-meta" class="modal-meta" style="margin-top: 0.5rem;">
               <p><i class="fa-solid fa-calendar-days"></i> 발매일: <span id="modal-release-date">-</span></p>
               <p style="margin-top: 0.25rem;"><i class="fa-solid fa-id-card"></i> ID: <span id="modal-nsuid">-</span></p>
             </div>
@@ -815,7 +900,8 @@
     // Global State
     let allData = { games: [], last_updated: '', total_games: 0, total_sales: 0 };
     let filteredGames = [];
-    let currentTab = 'discount'; // 'discount' | 'new' | 'all'
+    let wishlist = [];
+    let currentTab = 'discount'; // 'discount' | 'new' | 'wishlist' | 'all'
     let currentSort = 'discount_desc';
     let searchQuery = '';
     
@@ -843,8 +929,19 @@
         document.getElementById('loader').style.display = 'none';
         document.getElementById('games-grid').style.display = 'grid';
         
-        // Initial build
-        setTab('discount');
+        // Load wishlist
+        initWishlist();
+        
+        // Load settings and set tab
+        const savedTab = localStorage.getItem('nintendo_current_tab');
+        const savedSort = localStorage.getItem('nintendo_current_sort');
+        
+        setTab(savedTab || 'discount');
+        if (savedSort) {
+          document.getElementById('sort-select').value = savedSort;
+          currentSort = savedSort;
+          applyFilters();
+        }
         
       } catch (error) {
         console.error('Failed to load JSON data:', error);
@@ -857,6 +954,66 @@
       }
     });
 
+    // Initialize Wishlist State
+    function initWishlist() {
+      const saved = localStorage.getItem('nintendo_wishlist');
+      wishlist = saved ? JSON.parse(saved) : [];
+      updateWishlistStats();
+    }
+
+    function updateWishlistStats() {
+      document.getElementById('stat-wishlist-count').textContent = wishlist.length.toLocaleString() + ' 개';
+    }
+
+    // Toggle Wishlist Status
+    function toggleFavorite(nsuid, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      
+      const index = wishlist.indexOf(nsuid);
+      if (index > -1) {
+        wishlist.splice(index, 1);
+      } else {
+        wishlist.push(nsuid);
+      }
+      
+      localStorage.setItem('nintendo_wishlist', JSON.stringify(wishlist));
+      updateWishlistStats();
+      
+      // Update UI: if we are on wishlist tab, we might need to filter out card
+      if (currentTab === 'wishlist') {
+        applyFilters();
+      } else {
+        renderGrid(); // update star icon
+      }
+      
+      // If modal is open for this game, update the modal button too
+      const modalNsuid = document.getElementById('modal-nsuid').textContent;
+      if (modalNsuid === nsuid) {
+        updateModalFavButton(nsuid);
+      }
+    }
+
+    function updateModalFavButton(nsuid) {
+      const btn = document.getElementById('modal-fav-btn');
+      const icon = btn.querySelector('i');
+      const isFavorite = wishlist.includes(nsuid);
+      
+      if (isFavorite) {
+        icon.className = 'fa-solid fa-star';
+        icon.style.color = '#eab308';
+      } else {
+        icon.className = 'fa-regular fa-star';
+        icon.style.color = 'var(--text-main)';
+      }
+    }
+
+    function toggleFavoriteFromModal() {
+      const nsuid = document.getElementById('modal-nsuid').textContent;
+      toggleFavorite(nsuid);
+    }
+
     // Handle tab change
     function setTab(tab) {
       currentTab = tab;
@@ -868,6 +1025,9 @@
       // Update Tab attributes
       document.querySelectorAll('.tab-btn').forEach(btn => btn.setAttribute('aria-selected', 'false'));
       document.getElementById(`tab-${tab}`).setAttribute('aria-selected', 'true');
+
+      // Save tab to localstorage
+      localStorage.setItem('nintendo_current_tab', tab);
 
       // Populate Sorting Option list depending on Tab
       const sortSelect = document.getElementById('sort-select');
@@ -888,6 +1048,14 @@
           <option value="price_desc">가격 높은 순</option>
         `;
         currentSort = 'release_desc';
+      } else if (tab === 'wishlist') {
+        sortSelect.innerHTML = `
+          <option value="discount_desc">할인율 높은 순</option>
+          <option value="price_asc">가격 낮은 순</option>
+          <option value="price_desc">가격 높은 순</option>
+          <option value="release_desc">최신 발매 순</option>
+        `;
+        currentSort = 'discount_desc';
       } else {
         sortSelect.innerHTML = `
           <option value="title_asc">가나다 순</option>
@@ -915,6 +1083,7 @@
     // Handle sorting change
     function handleSort(sortVal) {
       currentSort = sortVal;
+      localStorage.setItem('nintendo_current_sort', sortVal);
       applyFilters();
     }
 
@@ -926,8 +1095,9 @@
       if (currentTab === 'discount') {
         result = result.filter(g => g.is_discounted === 1);
       } else if (currentTab === 'new') {
-        // Just sort by release date and limit or filter to recent
-        // We'll show all but typically sorted by date
+        // Just sort by date
+      } else if (currentTab === 'wishlist') {
+        result = result.filter(g => wishlist.includes(g.nsuid));
       }
       
       // 2. Search query filter
@@ -944,7 +1114,6 @@
         result.sort((a, b) => b.discount_price - a.discount_price);
       } else if (currentSort === 'release_desc') {
         result.sort((a, b) => {
-          // Compare release dates, dates are like '26.12.3' or '25.01.24'
           const dateA = convertDate(a.release_date);
           const dateB = convertDate(b.release_date);
           return dateB - dateA;
@@ -969,7 +1138,6 @@
       try {
         const parts = dateStr.split('.');
         if (parts.length === 3) {
-          // Format assumes 2000s
           const year = parseInt(parts[0]) + 2000;
           const month = parseInt(parts[1]) - 1;
           const day = parseInt(parts[2]);
@@ -985,8 +1153,32 @@
       const empty = document.getElementById('empty-state');
       const loadMoreContainer = document.getElementById('load-more-container');
       const showingText = document.getElementById('showing-text');
+      const wishlistBanner = document.getElementById('wishlist-banner');
       
       grid.innerHTML = '';
+      
+      // Wishlist summary banner logic
+      if (currentTab === 'wishlist' && filteredGames.length > 0) {
+        const discountedFavs = filteredGames.filter(g => g.is_discounted === 1);
+        const totalSavings = discountedFavs.reduce((sum, g) => sum + (g.regular_price - g.discount_price), 0);
+        
+        if (discountedFavs.length > 0) {
+          wishlistBanner.style.background = 'rgba(16, 185, 129, 0.12)';
+          wishlistBanner.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+          wishlistBanner.style.color = 'var(--accent-color)';
+          document.getElementById('wishlist-banner-text').innerHTML = 
+            `관심 게임 <strong>${filteredGames.length}개</strong> 중 <strong>${discountedFavs.length}개</strong>가 현재 할인 중입니다! 구매 시 총 <strong>₩${totalSavings.toLocaleString()}</strong> 절약 가능!`;
+        } else {
+          wishlistBanner.style.background = 'rgba(255, 255, 255, 0.03)';
+          wishlistBanner.style.borderColor = 'var(--card-border)';
+          wishlistBanner.style.color = 'var(--text-muted)';
+          document.getElementById('wishlist-banner-text').innerHTML = 
+            `관심 게임 <strong>${filteredGames.length}개</strong> 중 현재 할인 중인 상품이 없습니다.`;
+        }
+        wishlistBanner.style.display = 'flex';
+      } else {
+        wishlistBanner.style.display = 'none';
+      }
       
       if (filteredGames.length === 0) {
         grid.style.display = 'none';
@@ -1008,12 +1200,17 @@
         card.onclick = () => openModal(game);
         card.onkeydown = (e) => { if (e.key === 'Enter') openModal(game); };
         
+        // Favorite Button UI
+        const isFavorite = wishlist.includes(game.nsuid);
+        const favIconClass = isFavorite ? 'fa-solid fa-star' : 'fa-regular fa-star';
+        const favColor = isFavorite ? '#eab308' : 'rgba(255,255,255,0.45)';
+        
         let badgesHtml = '';
         if (game.is_discounted) {
           badgesHtml += `<span class="badge-discount">${game.discount_rate}% SALE</span>`;
         }
         
-        // Show "NEW" badge if released in the last 60 days from local date
+        // Show "NEW" badge if released in the last 60 days
         const releaseTime = convertDate(game.release_date).getTime();
         const sixtyDaysAgo = Date.now() - (60 * 24 * 60 * 60 * 1000);
         if (releaseTime > sixtyDaysAgo) {
@@ -1031,6 +1228,9 @@
              
         card.innerHTML = `
           <div class="game-img-wrapper">
+            <button class="btn-fav" onclick="toggleFavorite('${game.nsuid}', event)" title="관심 게임 추가/제거">
+              <i class="${favIconClass}" style="color: ${favColor};"></i>
+            </button>
             ${badgesHtml}
             <img src="${game.image_url || 'https://via.placeholder.com/320x180?text=No+Image'}" 
                  alt="${game.title}" 
@@ -1086,6 +1286,9 @@
         currentPriceEl.textContent = `₩${Number(game.regular_price).toLocaleString()}`;
         currentPriceEl.style.color = 'var(--text-main)';
       }
+      
+      // Update modal favorite button status
+      updateModalFavButton(game.nsuid);
       
       // Show/Hide Price history chart
       const chartSection = document.getElementById('modal-history-section');
