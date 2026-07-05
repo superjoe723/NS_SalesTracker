@@ -1749,7 +1749,19 @@
       
       // 3. Sorting
       if (currentSort === 'default') {
-        result.sort((a, b) => b.original_index - a.original_index);
+        if (currentTab === 'discount') {
+          result.sort((a, b) => {
+            const posA = a.sale_position !== null && a.sale_position !== undefined ? a.sale_position : 999999;
+            const posB = b.sale_position !== null && b.sale_position !== undefined ? b.sale_position : 999999;
+            return posA - posB;
+          });
+        } else {
+          result.sort((a, b) => {
+            const posA = a.store_position !== null && a.store_position !== undefined ? a.store_position : 999999;
+            const posB = b.store_position !== null && b.store_position !== undefined ? b.store_position : 999999;
+            return posA - posB;
+          });
+        }
       } else if (currentSort === 'discount_desc') {
         result.sort((a, b) => b.discount_rate - a.discount_rate);
       } else if (currentSort === 'price_asc') {

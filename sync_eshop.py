@@ -32,7 +32,8 @@ def export_to_json(db_path, json_path):
     # 3. Fetch all games with their latest price info, ordered by store_position (position)
     cursor.execute('''
         SELECT g.nsuid, g.product_id, g.title, g.release_date, g.image_url,
-               p.regular_price, p.discount_price, p.is_discounted
+               p.regular_price, p.discount_price, p.is_discounted,
+               g.store_position, g.sale_position
         FROM games g
         LEFT JOIN price_history p ON g.nsuid = p.nsuid AND p.logged_date = ?
         ORDER BY COALESCE(g.store_position, 999999) ASC
@@ -62,7 +63,7 @@ def export_to_json(db_path, json_path):
     total_sales = 0
     
     for r in rows:
-        nsuid, product_id, title, release_date, image_url, reg_price, disc_price, is_disc = r
+        nsuid, product_id, title, release_date, image_url, reg_price, disc_price, is_disc, store_pos, sale_pos = r
         
         # Default fallback values if no price history is recorded yet
         reg_price = reg_price or 0
@@ -84,7 +85,9 @@ def export_to_json(db_path, json_path):
             "regular_price": reg_price,
             "discount_price": disc_price,
             "is_discounted": is_disc,
-            "discount_rate": discount_rate
+            "discount_rate": discount_rate,
+            "store_position": store_pos,
+            "sale_position": sale_pos
         }
         
         # Add history if available (only for discounted games to keep size down)
@@ -217,6 +220,14 @@ def init_db(db_path):
         print("Migrating games table to add store_position...")
         cursor.execute("ALTER TABLE games ADD COLUMN store_position INTEGER")
         conn.commit()
+    
+    # Check for sale_position column migration
+    cursor.execute("PRAGMA table_info(games)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if columns and "sale_position" not in columns:
+        print("Migrating games table to add sale_position...")
+        cursor.execute("ALTER TABLE games ADD COLUMN sale_position INTEGER")
+        conn.commit()
 
     # Games metadata table (rarely changes)
     cursor.execute('''
@@ -227,6 +238,7 @@ def init_db(db_path):
             release_date TEXT,
             image_url TEXT,
             store_position INTEGER,
+            sale_position INTEGER,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -283,6 +295,41 @@ def save_products_to_db(conn, products):
         ))
         
     conn.commit()
+
+def sync_sale_positions(conn):
+    print("Syncing sale positions from digital/sale...")
+    cursor = conn.cursor()
+    
+    # Reset all sale_position values to NULL first (since sales list changes daily)
+    cursor.execute("UPDATE games SET sale_position = NULL")
+    conn.commit()
+    
+    page = 1
+    total_saved = 0
+    while True:
+        url = f"https://store.nintendo.co.kr/digital/sale?p={page}&product_list_order=position&product_list_dir=asc"
+        print(f"Syncing sale positions: Page {page} ... ", end="", flush=True)
+        try:
+            html = get_html(url)
+            products = parse_products_from_html(html)
+            if not products:
+                print("No products found. Finished.")
+                break
+                
+            for idx, p in enumerate(products):
+                pos = (page - 1) * 24 + idx + 1
+                cursor.execute("UPDATE games SET sale_position = ? WHERE nsuid = ?", (pos, p["nsuid"]))
+                
+            conn.commit()
+            total_saved += len(products)
+            print(f"Saved {len(products)} sale positions.")
+            page += 1
+            time.sleep(1.0)
+        except Exception as e:
+            print(f"Failed! Error: {e}")
+            break
+            
+    print(f"Finished syncing {total_saved} sale positions.")
 
 def main():
     parser = argparse.ArgumentParser(description="Nintendo Switch Korea eShop Database Sync Script")
@@ -345,6 +392,9 @@ def main():
             print(f"Failed! Error: {e}")
             
         time.sleep(1.0)
+
+    # Sync digital/sale positions
+    sync_sale_positions(conn)
 
     conn.close()
     export_to_json(args.db, args.json_out)
