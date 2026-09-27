@@ -33,7 +33,7 @@ def export_to_json(db_path, json_path):
     cursor.execute('''
         SELECT g.nsuid, g.product_id, g.title, g.release_date, g.image_url,
                p.regular_price, p.discount_price, p.is_discounted,
-               g.store_position, g.sale_position
+               g.store_position, g.sale_position, g.maker
         FROM games g
         LEFT JOIN price_history p ON g.nsuid = p.nsuid AND p.logged_date = ?
         ORDER BY COALESCE(g.store_position, 999999) ASC
@@ -61,22 +61,26 @@ def export_to_json(db_path, json_path):
         
     games_list = []
     total_sales = 0
-    
+    makers_seen = set()
+
     for r in rows:
-        nsuid, product_id, title, release_date, image_url, reg_price, disc_price, is_disc, store_pos, sale_pos = r
-        
+        nsuid, product_id, title, release_date, image_url, reg_price, disc_price, is_disc, store_pos, sale_pos, maker = r
+
         # Default fallback values if no price history is recorded yet
         reg_price = reg_price or 0
         disc_price = disc_price or reg_price or 0
         is_disc = is_disc or 0
-        
+
         if is_disc:
             total_sales += 1
-            
+
         discount_rate = 0
         if is_disc and reg_price > 0:
             discount_rate = int((reg_price - disc_price) / reg_price * 100)
-            
+
+        if maker:
+            makers_seen.add(maker)
+
         game_data = {
             "nsuid": nsuid,
             "title": title,
@@ -87,19 +91,21 @@ def export_to_json(db_path, json_path):
             "is_discounted": is_disc,
             "discount_rate": discount_rate,
             "store_position": store_pos,
-            "sale_position": sale_pos
+            "sale_position": sale_pos,
+            "maker": maker
         }
-        
+
         # Add history if available (only for discounted games to keep size down)
         if nsuid in history_map:
             game_data["history"] = history_map[nsuid]
-            
+
         games_list.append(game_data)
-        
+
     data = {
         "last_updated": last_updated,
         "total_games": len(games_list),
         "total_sales": total_sales,
+        "makers": sorted(makers_seen, key=lambda s: s.lower()),
         "games": games_list
     }
     
@@ -229,6 +235,14 @@ def init_db(db_path):
         cursor.execute("ALTER TABLE games ADD COLUMN sale_position INTEGER")
         conn.commit()
 
+    # Check for maker column migration
+    cursor.execute("PRAGMA table_info(games)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if columns and "maker" not in columns:
+        print("Migrating games table to add maker...")
+        cursor.execute("ALTER TABLE games ADD COLUMN maker TEXT")
+        conn.commit()
+
     # Games metadata table (rarely changes)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS games (
@@ -239,6 +253,7 @@ def init_db(db_path):
             image_url TEXT,
             store_position INTEGER,
             sale_position INTEGER,
+            maker TEXT,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -331,17 +346,138 @@ def sync_sale_positions(conn):
             
     print(f"Finished syncing {total_saved} sale positions.")
 
+def parse_publisher_filter(html):
+    """Parse the '메이커' (publisher) layered-navigation filter sidebar into a list of
+    {"id": ..., "name": ..., "count": ...} entries."""
+    start = html.find('am-ranges-publisher')
+    if start == -1:
+        return []
+    end = html.find('</form>', start)
+    section = html[start:end] if end != -1 else html[start:]
+
+    entries = re.findall(
+        r'data-label="([^"]+)"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>\s*<span class="label">[^<]*</span>\s*<span class="count">(\d+)',
+        section, re.DOTALL
+    )
+
+    publishers = []
+    for name, href, count in entries:
+        id_match = re.search(r'publisher=(\d+)', href)
+        if not id_match:
+            continue
+        publishers.append({
+            "id": id_match.group(1),
+            "name": name.strip(),
+            "count": int(count)
+        })
+    return publishers
+
+def backfill_makers(conn):
+    """One-time bulk backfill: crawl the store filtered by each publisher (메이커) so every
+    existing game gets tagged with its maker. Uses the layered-navigation publisher filter
+    instead of visiting each product's detail page individually (much fewer requests)."""
+    print("Fetching publisher (메이커) filter list...")
+    try:
+        html = get_html(BASE_URL)
+    except Exception as e:
+        print(f"Error fetching the homepage: {e}")
+        return
+
+    publishers = parse_publisher_filter(html)
+    if not publishers:
+        print("Could not find any publisher filter entries. Aborting maker backfill.")
+        return
+
+    print(f"Found {len(publishers)} makers. Starting backfill...")
+    cursor = conn.cursor()
+    total_tagged = 0
+
+    for i, pub in enumerate(publishers, 1):
+        pages = max(1, math.ceil(pub["count"] / 24))
+        print(f"[{i}/{len(publishers)}] {pub['name']} ({pub['count']}건, {pages}페이지) ... ", end="", flush=True)
+        tagged_for_pub = 0
+
+        for page in range(1, pages + 1):
+            url = f"{BASE_URL}?publisher={pub['id']}&p={page}&product_list_order=position"
+            try:
+                page_html = get_html(url)
+                products = parse_products_from_html(page_html)
+                if not products:
+                    break
+                for p in products:
+                    cursor.execute("UPDATE games SET maker = ? WHERE nsuid = ?", (pub["name"], p["nsuid"]))
+                    tagged_for_pub += 1
+            except Exception as e:
+                print(f"(page {page} failed: {e}) ", end="", flush=True)
+            time.sleep(1.0)
+
+        conn.commit()
+        total_saved_msg = f"{tagged_for_pub}개 태깅"
+        print(total_saved_msg)
+        total_tagged += tagged_for_pub
+
+    print(f"Maker backfill finished. Tagged {total_tagged} game rows across {len(publishers)} makers.")
+
+def fetch_maker_from_detail_page(nsuid):
+    """Fetch a single product's detail page and extract its maker (메이커/퍼블리셔)."""
+    url = f"https://store.nintendo.co.kr/{nsuid}"
+    html = get_html(url)
+    match = re.search(
+        r'<div class="product-attribute publisher\s*">.*?<div class="attribute-item-val">\s*([^<]+?)\s*</div>',
+        html, re.DOTALL
+    )
+    return match.group(1).strip() if match else None
+
+def update_makers_for_new_games(conn, limit=50):
+    """Cheap incremental update: only fetch the maker for games that don't have one yet
+    (i.e. newly discovered games since the last full backfill). Bounded by `limit` so a
+    daily sync never balloons into a full re-crawl."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM games WHERE maker IS NULL")
+    null_count = cursor.fetchone()[0]
+
+    if null_count == 0:
+        return
+
+    if null_count > limit:
+        print(f"{null_count}개 게임에 메이커 정보가 없습니다. (기준치 {limit}개 초과)")
+        print("최초 백필이 필요하면 'python3 sync_eshop.py --backfill-makers'를 실행하세요.")
+        return
+
+    print(f"Fetching maker info for {null_count} new game(s)...")
+    cursor.execute("SELECT nsuid FROM games WHERE maker IS NULL")
+    nsuids = [row[0] for row in cursor.fetchall()]
+
+    for nsuid in nsuids:
+        try:
+            maker = fetch_maker_from_detail_page(nsuid)
+            if maker:
+                cursor.execute("UPDATE games SET maker = ? WHERE nsuid = ?", (maker, nsuid))
+                conn.commit()
+        except Exception as e:
+            print(f"  Failed to fetch maker for {nsuid}: {e}")
+        time.sleep(1.0)
+
+    print("Finished updating makers for new games.")
+
 def main():
     parser = argparse.ArgumentParser(description="Nintendo Switch Korea eShop Database Sync Script")
     parser.add_argument("--db", default="database.sqlite", help="Path to SQLite database file")
     parser.add_argument("--quick", action="store_true", help="Only sync the first 2 pages for a quick test")
     parser.add_argument("--limit-pages", type=int, default=0, help="Limit syncing to a maximum number of pages")
     parser.add_argument("--json-out", default="docs/data.json", help="Path to output JSON file for web viewer")
+    parser.add_argument("--backfill-makers", action="store_true", help="Run a one-time bulk backfill of maker (메이커) info for all existing games, then exit")
     args = parser.parse_args()
 
     print("Initializing Database...")
     conn = init_db(args.db)
-    
+
+    if args.backfill_makers:
+        backfill_makers(conn)
+        conn.close()
+        export_to_json(args.db, args.json_out)
+        return
+
     print("Fetching first page to determine total products...")
     try:
         first_page_html = get_html(BASE_URL)
@@ -395,6 +531,10 @@ def main():
 
     # Sync digital/sale positions
     sync_sale_positions(conn)
+
+    # Fetch maker info only for newly discovered games (cheap incremental update;
+    # run --backfill-makers separately for the full catalog)
+    update_makers_for_new_games(conn)
 
     conn.close()
     export_to_json(args.db, args.json_out)

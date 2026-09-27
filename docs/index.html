@@ -832,6 +832,47 @@
       color: var(--text-main);
     }
 
+    .maker-suggestions-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 5.5rem;
+      max-height: 220px;
+      overflow-y: auto;
+      background: var(--card-bg, #1e293b);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+      z-index: 20;
+    }
+
+    .maker-suggestion-item {
+      padding: 0.55rem 0.9rem;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      color: var(--text-main);
+    }
+
+    .maker-suggestion-item:hover,
+    .maker-suggestion-item.active {
+      background: rgba(168, 85, 247, 0.15);
+    }
+
+    .maker-suggestion-item .count {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+
+    .maker-suggestion-empty {
+      padding: 0.6rem 0.9rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
     .btn-unblock {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--card-border);
@@ -1274,7 +1315,31 @@
             <!-- Keywords will be rendered as badges -->
           </div>
         </div>
-        
+
+        <!-- Maker Blacklist -->
+        <div style="margin-bottom: 2.5rem;">
+          <h3 class="settings-section-title">
+            <i class="fa-solid fa-industry" style="color: #a855f7;"></i> 메이커(제작사) 차단
+          </h3>
+          <p class="settings-desc">
+            차단한 메이커가 만든 게임은 모든 목록에서 완전히 제외됩니다. 입력하면 실제 메이커 목록에서 자동완성됩니다.
+          </p>
+
+          <div class="keyword-input-row" style="position: relative;">
+            <input type="text" id="maker-input" placeholder="메이커명 입력 (예: HAMSTER)" autocomplete="off"
+                   oninput="handleMakerInput(this.value)"
+                   onkeydown="if(event.key === 'Enter') addMakerFromInput()"
+                   onblur="setTimeout(hideMakerSuggestions, 150)"
+                   class="search-input" style="padding-left: 1.25rem;">
+            <button onclick="addMakerFromInput()" class="btn-add-keyword">추가</button>
+            <div id="maker-suggestions" class="maker-suggestions-list" style="display: none;"></div>
+          </div>
+
+          <div id="maker-list" class="keyword-badges-list" style="margin-top: 0.75rem;">
+            <!-- Blocked makers will be rendered as badges -->
+          </div>
+        </div>
+
         <!-- Game Blacklist -->
         <div>
           <h3 class="settings-section-title">
@@ -1380,6 +1445,7 @@
     let wishlist = [];
     let blacklist = [];
     let blacklistKeywords = [];
+    let blacklistMakers = [];
     let currentTab = 'discount'; // 'discount' | 'new' | 'wishlist' | 'all' | 'settings'
     let currentSort = 'discount_desc';
     let searchQuery = '';
@@ -1457,6 +1523,9 @@
       
       const savedKeywords = localStorage.getItem('nintendo_blacklist_keywords');
       blacklistKeywords = savedKeywords ? JSON.parse(savedKeywords) : [];
+
+      const savedMakers = localStorage.getItem('nintendo_blacklist_makers');
+      blacklistMakers = savedMakers ? JSON.parse(savedMakers) : [];
     }
 
     // Toggle Wishlist Status
@@ -1577,6 +1646,95 @@
       }
     }
 
+    // Maker (메이커) blacklist management — autocomplete against allData.makers
+    let makerSuggestionActiveIndex = -1;
+
+    function getMakerCount(makerName) {
+      return allData.games.reduce((acc, g) => acc + (g.maker === makerName ? 1 : 0), 0);
+    }
+
+    function handleMakerInput(value) {
+      const query = value.trim().toLowerCase();
+      makerSuggestionActiveIndex = -1;
+      const box = document.getElementById('maker-suggestions');
+
+      if (!query) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+      }
+
+      const makers = allData.makers || [];
+      const matches = makers
+        .filter(m => m.toLowerCase().includes(query) && !blacklistMakers.includes(m))
+        .slice(0, 8);
+
+      if (matches.length === 0) {
+        box.innerHTML = '<div class="maker-suggestion-empty">일치하는 메이커가 없습니다.</div>';
+        box.style.display = 'block';
+        return;
+      }
+
+      box.innerHTML = matches.map(m => `
+        <div class="maker-suggestion-item" onclick="selectMakerSuggestion('${escapeHtmlJS(m)}')">
+          <span>${escapeHtml(m)}</span>
+          <span class="count">${getMakerCount(m)}개</span>
+        </div>
+      `).join('');
+      box.style.display = 'block';
+    }
+
+    function hideMakerSuggestions() {
+      const box = document.getElementById('maker-suggestions');
+      if (box) box.style.display = 'none';
+    }
+
+    function selectMakerSuggestion(makerName) {
+      addMakerBlock(makerName);
+      document.getElementById('maker-input').value = '';
+      hideMakerSuggestions();
+    }
+
+    function addMakerFromInput() {
+      const input = document.getElementById('maker-input');
+      const typed = input.value.trim();
+      if (!typed) return;
+
+      // Only accept an exact (case-insensitive) match against the known maker list,
+      // so a typo can never silently create a dead filter entry.
+      const makers = allData.makers || [];
+      const exactMatch = makers.find(m => m.toLowerCase() === typed.toLowerCase());
+
+      if (!exactMatch) {
+        input.style.borderColor = 'var(--primary-color)';
+        setTimeout(() => { input.style.borderColor = ''; }, 900);
+        return;
+      }
+
+      addMakerBlock(exactMatch);
+      input.value = '';
+      hideMakerSuggestions();
+    }
+
+    function addMakerBlock(makerName) {
+      if (!blacklistMakers.includes(makerName)) {
+        blacklistMakers.push(makerName);
+        localStorage.setItem('nintendo_blacklist_makers', JSON.stringify(blacklistMakers));
+        renderBlacklistPanel();
+        applyFilters();
+      }
+    }
+
+    function removeMakerBlock(makerName) {
+      const index = blacklistMakers.indexOf(makerName);
+      if (index > -1) {
+        blacklistMakers.splice(index, 1);
+        localStorage.setItem('nintendo_blacklist_makers', JSON.stringify(blacklistMakers));
+        renderBlacklistPanel();
+        applyFilters();
+      }
+    }
+
     // Render settings panel details
     function renderBlacklistPanel() {
       // 1. Render Keywords
@@ -1594,7 +1752,22 @@
         });
       }
       
-      // 2. Render blocked games list
+      // 2. Render blocked makers
+      const makerListDiv = document.getElementById('maker-list');
+      makerListDiv.innerHTML = '';
+
+      if (blacklistMakers.length === 0) {
+        makerListDiv.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">차단된 메이커가 없습니다.</span>';
+      } else {
+        blacklistMakers.forEach(m => {
+          const badge = document.createElement('span');
+          badge.className = 'keyword-badge';
+          badge.innerHTML = `${escapeHtml(m)} <i class="fa-solid fa-xmark" onclick="removeMakerBlock('${escapeHtmlJS(m)}')"></i>`;
+          makerListDiv.appendChild(badge);
+        });
+      }
+
+      // 3. Render blocked games list
       document.getElementById('blacklisted-games-count').textContent = blacklist.length;
       const gamesListDiv = document.getElementById('blacklisted-games-list');
       gamesListDiv.innerHTML = '';
@@ -1724,12 +1897,15 @@
       result = result.filter(g => {
         // Filter out individual blocked games
         if (blacklist.includes(g.nsuid)) return false;
-        
+
         // Filter out keyword matches
         const titleLower = g.title.toLowerCase();
         const matchesKeyword = blacklistKeywords.some(kw => titleLower.includes(kw.toLowerCase()));
         if (matchesKeyword) return false;
-        
+
+        // Filter out blocked makers
+        if (g.maker && blacklistMakers.includes(g.maker)) return false;
+
         return true;
       });
       
