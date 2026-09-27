@@ -686,7 +686,7 @@
 
     .price-stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 1rem;
       margin-bottom: 1.5rem;
       padding: 1rem;
@@ -865,6 +865,32 @@
       color: var(--text-muted);
       font-size: 0.78rem;
       flex-shrink: 0;
+    }
+
+    .maker-suggestion-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .maker-bulk-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 10px;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      font-size: 0.85rem;
+      color: var(--text-main);
+    }
+
+    .maker-bulk-actions .count-label {
+      font-weight: 700;
+      color: #a855f7;
     }
 
     .maker-suggestion-empty {
@@ -1278,6 +1304,23 @@
         </div>
       </div>
 
+      <!-- Extra filters: price range + release year (combine with tab/search/sort/blacklist via AND) -->
+      <div class="search-row" id="extra-filter-row" style="margin-top: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <input type="number" id="price-min-input" class="search-input" placeholder="최소 가격"
+                 style="padding-left: 1rem; width: 120px;" min="0" oninput="handleExtraFilterChange()">
+          <span style="color: var(--text-muted);">~</span>
+          <input type="number" id="price-max-input" class="search-input" placeholder="최대 가격"
+                 style="padding-left: 1rem; width: 120px;" min="0" oninput="handleExtraFilterChange()">
+        </div>
+        <div class="sort-wrapper">
+          <select id="release-year-select" class="sort-select" onchange="handleExtraFilterChange()">
+            <option value="">전체 발매연도</option>
+          </select>
+        </div>
+        <button onclick="resetExtraFilters()" class="btn-unblock" style="white-space: nowrap;">필터 초기화</button>
+      </div>
+
     </div>
   </section>
 
@@ -1332,7 +1375,13 @@
                    onblur="setTimeout(hideMakerSuggestions, 150)"
                    class="search-input" style="padding-left: 1.25rem;">
             <button onclick="addMakerFromInput()" class="btn-add-keyword">추가</button>
-            <div id="maker-suggestions" class="maker-suggestions-list" style="display: none;"></div>
+            <div id="maker-suggestions" class="maker-suggestions-list" style="display: none;" onmousedown="event.preventDefault()"></div>
+          </div>
+
+          <div id="maker-bulk-actions" class="maker-bulk-actions" style="display: none;">
+            <span><span class="count-label">0</span>개 선택됨</span>
+            <button onclick="addSelectedMakers()" class="btn-add-keyword">선택한 메이커 모두 차단</button>
+            <button onclick="clearMakerSelection()" class="btn-unblock">선택 해제</button>
           </div>
 
           <div id="maker-list" class="keyword-badges-list" style="margin-top: 0.75rem;">
@@ -1419,6 +1468,10 @@
             <span class="price-stat-label">현재 가격 (Current Price)</span>
             <span class="price-stat-val sale" id="modal-current-price">₩0</span>
           </div>
+          <div class="price-stat-item">
+            <span class="price-stat-label">역대 최저가 (All-time Low)</span>
+            <span class="price-stat-val" id="modal-lowest-price" style="color: #f59e0b;">정보 없음</span>
+          </div>
         </div>
 
         <div id="modal-history-section" style="display: none;">
@@ -1449,6 +1502,9 @@
     let currentTab = 'discount'; // 'discount' | 'new' | 'wishlist' | 'all' | 'settings'
     let currentSort = 'discount_desc';
     let searchQuery = '';
+    let priceMinFilter = null;
+    let priceMaxFilter = null;
+    let releaseYearFilter = '';
     
     // Pagination state
     let itemsToShow = 30;
@@ -1482,7 +1538,8 @@
         // Load data stores
         initWishlist();
         initBlacklist();
-        
+        populateReleaseYearOptions();
+
         // Load settings and set tab
         const savedTab = localStorage.getItem('nintendo_current_tab');
         const savedSort = localStorage.getItem('nintendo_current_sort');
@@ -1648,6 +1705,7 @@
 
     // Maker (메이커) blacklist management — autocomplete against allData.makers
     let makerSuggestionActiveIndex = -1;
+    let selectedMakerSuggestions = new Set();
 
     function getMakerCount(makerName) {
       return allData.games.reduce((acc, g) => acc + (g.maker === makerName ? 1 : 0), 0);
@@ -1675,13 +1733,66 @@
         return;
       }
 
+      // Each suggestion supports two ways to block a maker:
+      // 1. Click the name -> block immediately (existing single-add behavior, unchanged)
+      // 2. Check the checkbox -> add to a pending multi-select, then use the bulk bar to block them all at once
       box.innerHTML = matches.map(m => `
-        <div class="maker-suggestion-item" onclick="selectMakerSuggestion('${escapeHtmlJS(m)}')">
-          <span>${escapeHtml(m)}</span>
+        <div class="maker-suggestion-item">
+          <label class="maker-suggestion-checkbox-label">
+            <input type="checkbox" ${selectedMakerSuggestions.has(m) ? 'checked' : ''}
+                   onchange="toggleMakerSuggestionSelection('${escapeHtmlJS(m)}', this.checked)">
+            <span onclick="selectMakerSuggestion('${escapeHtmlJS(m)}')">${escapeHtml(m)}</span>
+          </label>
           <span class="count">${getMakerCount(m)}개</span>
         </div>
       `).join('');
       box.style.display = 'block';
+    }
+
+    function toggleMakerSuggestionSelection(makerName, checked) {
+      if (checked) {
+        selectedMakerSuggestions.add(makerName);
+      } else {
+        selectedMakerSuggestions.delete(makerName);
+      }
+      updateMakerBulkActionsBar();
+    }
+
+    function updateMakerBulkActionsBar() {
+      const bar = document.getElementById('maker-bulk-actions');
+      if (!bar) return;
+      if (selectedMakerSuggestions.size > 0) {
+        bar.style.display = 'flex';
+        bar.querySelector('.count-label').textContent = selectedMakerSuggestions.size;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    function clearMakerSelection() {
+      selectedMakerSuggestions.clear();
+      updateMakerBulkActionsBar();
+      handleMakerInput(document.getElementById('maker-input').value);
+    }
+
+    function addSelectedMakers() {
+      if (selectedMakerSuggestions.size === 0) return;
+      let added = false;
+      selectedMakerSuggestions.forEach(m => {
+        if (!blacklistMakers.includes(m)) {
+          blacklistMakers.push(m);
+          added = true;
+        }
+      });
+      if (added) {
+        localStorage.setItem('nintendo_blacklist_makers', JSON.stringify(blacklistMakers));
+      }
+      selectedMakerSuggestions.clear();
+      updateMakerBulkActionsBar();
+      document.getElementById('maker-input').value = '';
+      hideMakerSuggestions();
+      renderBlacklistPanel();
+      applyFilters();
     }
 
     function hideMakerSuggestions() {
@@ -1723,6 +1834,8 @@
         renderBlacklistPanel();
         applyFilters();
       }
+      selectedMakerSuggestions.delete(makerName);
+      updateMakerBulkActionsBar();
     }
 
     function removeMakerBlock(makerName) {
@@ -1887,6 +2000,49 @@
       applyFilters();
     }
 
+    // release_date is stored as "YY.M.D" (e.g. "25.8.14") -> returns "2025"
+    function getReleaseYear(releaseDate) {
+      if (!releaseDate) return null;
+      const match = releaseDate.match(/^(\d{2})\./);
+      return match ? `20${match[1]}` : null;
+    }
+
+    function populateReleaseYearOptions() {
+      const years = new Set();
+      allData.games.forEach(g => {
+        const y = getReleaseYear(g.release_date);
+        if (y) years.add(y);
+      });
+
+      const select = document.getElementById('release-year-select');
+      Array.from(years).sort((a, b) => b - a).forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = `${y}년`;
+        select.appendChild(opt);
+      });
+    }
+
+    function handleExtraFilterChange() {
+      const minVal = document.getElementById('price-min-input').value;
+      const maxVal = document.getElementById('price-max-input').value;
+      priceMinFilter = minVal !== '' ? Number(minVal) : null;
+      priceMaxFilter = maxVal !== '' ? Number(maxVal) : null;
+      releaseYearFilter = document.getElementById('release-year-select').value;
+      itemsToShow = itemsPerLoad;
+      applyFilters();
+    }
+
+    function resetExtraFilters() {
+      document.getElementById('price-min-input').value = '';
+      document.getElementById('price-max-input').value = '';
+      document.getElementById('release-year-select').value = '';
+      priceMinFilter = null;
+      priceMaxFilter = null;
+      releaseYearFilter = '';
+      applyFilters();
+    }
+
     // Filter, Sort and Paginate games
     function applyFilters() {
       if (currentTab === 'settings') return;
@@ -1922,7 +2078,20 @@
       if (searchQuery) {
         result = result.filter(g => g.title.toLowerCase().includes(searchQuery));
       }
-      
+
+      // 2b. Price range + release year filter (combine with everything above via AND)
+      if (priceMinFilter !== null || priceMaxFilter !== null) {
+        result = result.filter(g => {
+          const effectivePrice = g.is_discounted ? g.discount_price : g.regular_price;
+          if (priceMinFilter !== null && effectivePrice < priceMinFilter) return false;
+          if (priceMaxFilter !== null && effectivePrice > priceMaxFilter) return false;
+          return true;
+        });
+      }
+      if (releaseYearFilter) {
+        result = result.filter(g => getReleaseYear(g.release_date) === releaseYearFilter);
+      }
+
       // 3. Sorting
       if (currentSort === 'default') {
         if (currentTab === 'discount') {
@@ -2127,11 +2296,16 @@
       
       // Show/Hide Price history chart
       const chartSection = document.getElementById('modal-history-section');
+      const lowestPriceEl = document.getElementById('modal-lowest-price');
       if (game.history && game.history.length > 0) {
         chartSection.style.display = 'block';
-        buildChart(game.history);
+        buildChart(game.history, game.regular_price);
+
+        const lowestEntry = game.history.reduce((min, h) => (h.price < min.price ? h : min), game.history[0]);
+        lowestPriceEl.textContent = `₩${Number(lowestEntry.price).toLocaleString()} (${lowestEntry.date})`;
       } else {
         chartSection.style.display = 'none';
+        lowestPriceEl.textContent = '정보 없음';
       }
       
       modal.classList.add('active');
@@ -2152,36 +2326,59 @@
     }
 
     // Build History line chart using Chart.js
-    function buildChart(history) {
+    function buildChart(history, regularPrice) {
       const ctx = document.getElementById('priceHistoryChart').getContext('2d');
-      
+
       // Sort history by date chronologically
       const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
-      
+
       const labels = sortedHistory.map(h => h.date);
       const data = sortedHistory.map(h => h.price);
+
+      // Highlight the all-time-low point(s) with a distinct color/size
+      const lowestPrice = Math.min(...data);
+      const pointColors = data.map(p => p === lowestPrice ? '#f59e0b' : '#10b981');
+      const pointRadii = data.map(p => p === lowestPrice ? 6 : 4);
+      const pointHoverRadii = data.map(p => p === lowestPrice ? 8 : 6);
 
       // Gradient for line fill
       const gradient = ctx.createLinearGradient(0, 0, 0, 200);
       gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
       gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
+      const datasets = [{
+        label: '가격 (₩)',
+        data: data,
+        borderColor: '#10b981',
+        borderWidth: 3,
+        fill: true,
+        backgroundColor: gradient,
+        tension: 0.3,
+        pointBackgroundColor: pointColors,
+        pointRadius: pointRadii,
+        pointHoverRadius: pointHoverRadii
+      }];
+
+      // Reference line for the regular (non-discounted) price, so discounts are easy to gauge visually
+      if (regularPrice && regularPrice > 0) {
+        datasets.push({
+          label: '정가 (₩)',
+          data: labels.map(() => regularPrice),
+          borderColor: 'rgba(148, 163, 184, 0.6)',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          fill: false,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0
+        });
+      }
+
       historyChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: labels,
-          datasets: [{
-            label: '가격 (₩)',
-            data: data,
-            borderColor: '#10b981',
-            borderWidth: 3,
-            fill: true,
-            backgroundColor: gradient,
-            tension: 0.3,
-            pointBackgroundColor: '#10b981',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
+          datasets: datasets
         },
         options: {
           responsive: true,
@@ -2191,7 +2388,9 @@
             tooltip: {
               callbacks: {
                 label: function(context) {
-                  return ` 가격: ₩${Number(context.raw).toLocaleString()}`;
+                  const prefix = context.dataset.label === '정가 (₩)' ? ' 정가: ' :
+                    (context.raw === lowestPrice ? ' 🔥 역대 최저가: ' : ' 가격: ');
+                  return `${prefix}₩${Number(context.raw).toLocaleString()}`;
                 }
               }
             }
@@ -2203,8 +2402,8 @@
             },
             y: {
               grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { 
-                color: '#94a3b8', 
+              ticks: {
+                color: '#94a3b8',
                 font: { family: 'Outfit' },
                 callback: function(value) {
                   return '₩' + Number(value).toLocaleString();
