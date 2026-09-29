@@ -322,11 +322,11 @@ def save_products_to_db(conn, products):
 def sync_sale_positions(conn):
     print("Syncing sale positions from digital/sale...")
     cursor = conn.cursor()
-    
-    # Reset all sale_position values to NULL first (since sales list changes daily)
-    cursor.execute("UPDATE games SET sale_position = NULL")
-    conn.commit()
-    
+
+    # Crawl into memory first. We only touch the DB once we know the crawl actually returned
+    # data, so a blocked/empty response (e.g. requests failing silently) can never wipe out
+    # sale_position values that were already correctly recorded.
+    positions = {}
     page = 1
     total_saved = 0
     while True:
@@ -338,20 +338,30 @@ def sync_sale_positions(conn):
             if not products:
                 print("No products found. Finished.")
                 break
-                
+
             for idx, p in enumerate(products):
                 pos = (page - 1) * 24 + idx + 1
-                cursor.execute("UPDATE games SET sale_position = ? WHERE nsuid = ?", (pos, p["nsuid"]))
-                
-            conn.commit()
+                positions[p["nsuid"]] = pos
+
             total_saved += len(products)
-            print(f"Saved {len(products)} sale positions.")
+            print(f"Found {len(products)} sale positions.")
             page += 1
             time.sleep(1.0)
         except Exception as e:
             print(f"Failed! Error: {e}")
             break
-            
+
+    if not positions:
+        print("No sale positions were crawled successfully; leaving existing sale_position values untouched.")
+        return
+
+    cursor.execute("UPDATE games SET sale_position = NULL")
+    cursor.executemany(
+        "UPDATE games SET sale_position = ? WHERE nsuid = ?",
+        [(pos, nsuid) for nsuid, pos in positions.items()]
+    )
+    conn.commit()
+
     print(f"Finished syncing {total_saved} sale positions.")
 
 def parse_publisher_filter(html):
