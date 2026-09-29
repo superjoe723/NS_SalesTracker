@@ -279,11 +279,19 @@ def save_products_to_db(conn, products):
     now_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     for p in products:
-        # 1. Update general metadata
+        # 1. Update general metadata. Uses an upsert (not INSERT OR REPLACE) so columns not
+        # listed here (maker, sale_position) are preserved instead of being reset to NULL.
         cursor.execute('''
-            INSERT OR REPLACE INTO games 
+            INSERT INTO games
             (nsuid, product_id, title, release_date, image_url, store_position, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(nsuid) DO UPDATE SET
+                product_id = excluded.product_id,
+                title = excluded.title,
+                release_date = excluded.release_date,
+                image_url = excluded.image_url,
+                store_position = excluded.store_position,
+                last_updated = excluded.last_updated
         ''', (
             p["nsuid"],
             p["product_id"],
